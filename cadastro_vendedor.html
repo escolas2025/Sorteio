@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cadastro de Vendedores</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+    body {
+      margin: 0;
+      padding: 20px;
+      background-color: #f2f2f2;
+    }
+    h2, h3 {
+      margin-bottom: 10px;
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px 5px 5px 0;
+      background-color: #2196f3;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:hover {
+      background-color: #0b7dda;
+    }
+    hr {
+      margin: 20px 0;
+    }
+    .vendedor-item {
+      background: white;
+      padding: 10px;
+      margin-bottom: 8px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .info-vendedor {
+      margin-top: 20px;
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #f0f0f0;
+    }
+    .top-values {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 15px;
+      flex-wrap: wrap;
+    }
+    .top-values span {
+      font-weight: bold;
+      margin: 5px 0;
+    }
+    @media (max-width: 600px) {
+      .top-values {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h2>Cadastrar Vendedor</h2>
+  <label for="nome">Nome:</label>
+  <input type="text" id="nome">
+  <label for="localidade">Localidade:</label>
+  <input type="text" id="localidade">
+  <label for="cotacao">Cotação de Vendas:</label>
+  <input type="number" id="cotacao" step="0.01">
+  <button onclick="salvarVendedor()">Salvar Vendedor</button>
+
+  <hr>
+
+  <h2>Lista de Vendedores</h2>
+  <div id="listaVendedores"></div>
+
+  <div id="dadosVendedorSelecionado" class="info-vendedor" style="display: none;">
+    <h3 id="nomeVendedorSelecionado">NOME DO VENDEDOR</h3>
+    <hr>
+    <div class="top-values">
+      <span>APURADO: <strong id="apuradoTotal">R$ 0,00</strong></span>
+      <span>PAGOU: <strong id="pagouTotal">R$ 0,00</strong></span>
+      <span>DEVE: <strong id="deveTotal">R$ 0,00</strong></span>
+    </div>
+    <hr>
+    <table id="tabelaVendas">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Recebeu</th>
+          <th>Devolveu</th>
+          <th>Vendeu</th>
+          <th>Apurou</th>
+          <th>Pagou</th>
+          <th>Ainda Deve</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <button onclick="adicionarLinha()">Adicionar Linha</button>
+    <button onclick="exportarPDF()">Exportar PDF</button>
+    <button onclick="limparVendas()">Limpar Vendas</button>
+    <button onclick="excluirVendedor()">Excluir Vendedor</button>
+  </div>
+
+  <script>
+    let vendedores = JSON.parse(localStorage.getItem("vendedores") || "[]");
+    let vendas = JSON.parse(localStorage.getItem("vendas") || "{}");
+    let vendedorAtual = null;
+
+    function salvarVendedor() {
+      const nome = document.getElementById('nome').value.trim();
+      const localidade = document.getElementById('localidade').value.trim();
+      const cotacao = parseFloat(document.getElementById('cotacao').value);
+
+      if (!nome || !localidade || isNaN(cotacao)) {
+        alert("Preencha todos os campos.");
+        return;
+      }
+
+      const novo = { nome, localidade, cotacao };
+      vendedores.push(novo);
+      vendas[nome] = [];
+      localStorage.setItem("vendedores", JSON.stringify(vendedores));
+      localStorage.setItem("vendas", JSON.stringify(vendas));
+      listarVendedores();
+
+      document.getElementById('nome').value = '';
+      document.getElementById('localidade').value = '';
+      document.getElementById('cotacao').value = '';
+    }
+
+    function listarVendedores() {
+      const lista = document.getElementById('listaVendedores');
+      lista.innerHTML = '';
+      vendedores.forEach((v, i) => {
+        const div = document.createElement('div');
+        div.className = "vendedor-item";
+        div.innerHTML = `<span>${v.nome} (${v.localidade})</span>`;
+        div.onclick = () => selecionarVendedor(i);
+        lista.appendChild(div);
+      });
+    }
+
+    function selecionarVendedor(index) {
+      vendedorAtual = vendedores[index];
+      document.getElementById('nomeVendedorSelecionado').textContent = vendedorAtual.nome.toUpperCase();
+      document.getElementById('dadosVendedorSelecionado').style.display = 'block';
+      atualizarTabela();
+    }
+
+    function adicionarLinha() {
+      if (!vendedorAtual) return;
+      const nome = vendedorAtual.nome;
+      const novaVenda = {
+        data: new Date().toLocaleDateString(),
+        recebeu: 0,
+        devolveu: 0,
+        pagou: 0
+      };
+      vendas[nome].push(novaVenda);
+      localStorage.setItem("vendas", JSON.stringify(vendas));
+      atualizarTabela();
+    }
+
+    function atualizarTabela() {
+      const nome = vendedorAtual.nome;
+      const cotacao = vendedorAtual.cotacao;
+      const tbody = document.querySelector("#tabelaVendas tbody");
+      tbody.innerHTML = '';
+
+      let totalVendeu = 0, totalApurou = 0, totalPagou = 0;
+
+      vendas[nome].forEach((venda, idx) => {
+        const vendeu = venda.recebeu - venda.devolveu;
+        const apurou = vendeu * cotacao;
+        const deve = apurou - venda.pagou;
+
+        totalVendeu += vendeu;
+        totalApurou += apurou;
+        totalPagou += venda.pagou;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><input type="text" value="${venda.data}" onchange="atualizaCampo(${idx}, 'data', this.value)"/></td>
+          <td><input type="number" value="${venda.recebeu}" onchange="atualizaCampo(${idx}, 'recebeu', parseFloat(this.value))"/></td>
+          <td><input type="number" value="${venda.devolveu}" onchange="atualizaCampo(${idx}, 'devolveu', parseFloat(this.value))"/></td>
+          <td>${vendeu}</td>
+          <td>R$ ${apurou.toFixed(2)}</td>
+          <td><input type="number" value="${venda.pagou}" onchange="atualizaCampo(${idx}, 'pagou', parseFloat(this.value))"/></td>
+          <td>R$ ${deve.toFixed(2)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('apuradoTotal').textContent = `R$ ${totalApurou.toFixed(2)}`;
+      document.getElementById('pagouTotal').textContent = `R$ ${totalPagou.toFixed(2)}`;
+      document.getElementById('deveTotal').textContent = `R$ ${(totalApurou - totalPagou).toFixed(2)}`;
+    }
+
+    function atualizaCampo(index, campo, valor) {
+      const nome = vendedorAtual.nome;
+      vendas[nome][index][campo] = valor;
+      localStorage.setItem("vendas", JSON.stringify(vendas));
+      atualizarTabela();
+    }
+
+    function limparVendas() {
+      if (!confirm("Deseja apagar todas as vendas deste vendedor?")) return;
+      vendas[vendedorAtual.nome] = [];
+      localStorage.setItem("vendas", JSON.stringify(vendas));
+      atualizarTabela();
+    }
+
+    function excluirVendedor() {
+      if (!confirm("Deseja excluir este vendedor e suas vendas?")) return;
+      const nome = vendedorAtual.nome;
+      vendedores = vendedores.filter(v => v.nome !== nome);
+      delete vendas[nome];
+      localStorage.setItem("vendedores", JSON.stringify(vendedores));
+      localStorage.setItem("vendas", JSON.stringify(vendas));
+      vendedorAtual = null;
+      document.getElementById('dadosVendedorSelecionado').style.display = 'none';
+      listarVendedores();
+    }
+
+    async function exportarPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      let y = 10;
+
+      doc.setFontSize(16);
+      doc.text(`Vendedor: ${vendedorAtual.nome}`, 10, y);
+      y += 10;
+      doc.setFontSize(12);
+      doc.text(`Localidade: ${vendedorAtual.localidade}`, 10, y);
+      y += 10;
+      doc.text(`Cotação: R$ ${vendedorAtual.cotacao.toFixed(2)}`, 10, y);
+      y += 10;
+
+      doc.text(`APURADO: ${document.getElementById("apuradoTotal").textContent}`, 10, y);
+      y += 7;
+      doc.text(`PAGOU: ${document.getElementById("pagouTotal").textContent}`, 10, y);
+      y += 7;
+      doc.text(`DEVE: ${document.getElementById("deveTotal").textContent}`, 10, y);
+      y += 10;
+
+      doc.text("Histórico de Vendas:", 10, y);
+      y += 8;
+
+      doc.setFontSize(10);
+      doc.text("Data | Recebeu | Devolveu | Vendeu | Apurou | Pagou | Deve", 10, y);
+      y += 5;
+
+      vendas[vendedorAtual.nome].forEach(v => {
+        const vendeu = v.recebeu - v.devolveu;
+        const apurou = vendeu * vendedorAtual.cotacao;
+        const deve = apurou - v.pagou;
+        doc.text(`${v.data} | ${v.recebeu} | ${v.devolveu} | ${vendeu} | R$${apurou.toFixed(2)} | R$${v.pagou.toFixed(2)} | R$${deve.toFixed(2)}`, 10, y);
+        y += 5;
+        if (y > 280) {
+          doc.addPage();
+          y = 10;
+        }
+      });
+
+      doc.save(`vendas_${vendedorAtual.nome}.pdf`);
+    }
+
+    listarVendedores();
+  </script>
+</body>
+</html>

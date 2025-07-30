@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Recibo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f9f9f9;
+    }
+    h2, h3 {
+      text-align: center;
+      font-size: 28px;
+      margin-bottom: 10px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      font-weight: bold;
+      font-size: 18px;
+    }
+    select, input[type="number"] {
+      width: 100%;
+      padding: 10px;
+      font-size: 18px;
+      margin-top: 5px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    button {
+      padding: 10px 16px;
+      font-size: 16px;
+      background: #2196f3;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 3px;
+    }
+    button:hover {
+      background: #0b7dda;
+    }
+    .recibo-output {
+      margin-top: 30px;
+      text-align: center;
+      font-size: 20px;
+      background: white;
+      padding: 30px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+    }
+    .recibo-lista {
+      margin-top: 40px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: center;
+      font-size: 16px;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    .editavel {
+      background: #fff8e1;
+      border: 1px solid #fbc02d;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>GERAR RECIBO</h2>
+
+  <div class="form-group">
+    <label for="vendedor">Selecionar Vendedor:</label>
+    <select id="vendedor" onchange="atualizarValorDevido()">
+      <option value="">Selecione</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>Total Devido:</label>
+    <div id="totalDevido">R$ 0,00</div>
+  </div>
+
+  <div class="form-group">
+    <label for="valorRecebido">Valor Recebido:</label>
+    <input type="number" id="valorRecebido" min="0" step="0.01" />
+  </div>
+
+  <button onclick="salvarPagamento()">Salvar Pagamento</button>
+  <button onclick="exportarPDF()">Exportar Último PDF</button>
+
+  <div class="recibo-output" id="reciboGerado" style="display:none;"></div>
+
+  <div class="recibo-lista">
+    <h3>RECIBOS GERADOS</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Vendedor</th>
+          <th>Valor</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody id="listaRecibos">
+        <!-- lista dinâmica -->
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const vendedores = JSON.parse(localStorage.getItem('vendedores')) || [];
+    const selectVendedor = document.getElementById("vendedor");
+    const totalDevidoSpan = document.getElementById("totalDevido");
+    let valorDevidoAtual = 0;
+    let ultimoRecibo = null;
+
+    vendedores.forEach(v => {
+      const option = document.createElement("option");
+      option.value = v.nome;
+      option.textContent = v.nome;
+      selectVendedor.appendChild(option);
+    });
+
+    function atualizarValorDevido() {
+      const nome = selectVendedor.value;
+      if (!nome) {
+        totalDevidoSpan.textContent = "R$ 0,00";
+        return;
+      }
+
+      const dados = JSON.parse(localStorage.getItem("vendas_" + nome)) || [];
+      let totalApurado = 0;
+      let totalPago = 0;
+      const vendedor = vendedores.find(v => v.nome === nome);
+      dados.forEach(item => {
+        const vendeu = parseFloat(item.recebeu || 0) - parseFloat(item.devolveu || 0);
+        const apurou = vendeu * parseFloat(vendedor.cotacao || 1);
+        totalApurado += apurou;
+        totalPago += parseFloat(item.pagou || 0);
+      });
+
+      valorDevidoAtual = totalApurado - totalPago;
+      totalDevidoSpan.textContent = `R$ ${valorDevidoAtual.toFixed(2)}`;
+    }
+
+    function salvarPagamento() {
+      const nome = selectVendedor.value;
+      const valorRecebido = parseFloat(document.getElementById("valorRecebido").value || 0);
+      if (!nome || valorRecebido <= 0) {
+        alert("Preencha corretamente os campos.");
+        return;
+      }
+
+      const dados = JSON.parse(localStorage.getItem("vendas_" + nome)) || [];
+      dados.push({
+        data: new Date().toLocaleDateString('pt-BR'),
+        recebeu: 0,
+        devolveu: 0,
+        vendeu: 0,
+        apurou: 0,
+        pagou: valorRecebido
+      });
+      localStorage.setItem("vendas_" + nome, JSON.stringify(dados));
+      atualizarValorDevido();
+
+      const dataHoje = new Date().toLocaleDateString('pt-BR');
+      const texto = `
+        <div id="reciboParaExportar" style="font-size:22px">
+          <h3 style="font-size:30px">RECIBO</h3>
+          <hr>
+          Recebemos de <strong>${nome}</strong> a quantia de <strong>R$ ${valorRecebido.toFixed(2)}</strong> referente à venda de cartelas.
+          <hr>
+          TIMONHA, ${dataHoje}
+        </div>
+      `;
+      document.getElementById("reciboGerado").innerHTML = texto;
+      document.getElementById("reciboGerado").style.display = "block";
+
+      const recibos = JSON.parse(localStorage.getItem("recibos") || "[]");
+      const recibo = { nome, valor: valorRecebido, data: dataHoje };
+      recibos.push(recibo);
+      localStorage.setItem("recibos", JSON.stringify(recibos));
+      ultimoRecibo = recibo;
+      listarRecibos();
+    }
+
+    function exportarPDF(recibo = null) {
+      let content;
+      if (recibo) {
+        content = document.createElement("div");
+        content.innerHTML = `
+          <div style="font-size:22px">
+            <h3 style="font-size:30px">RECIBO</h3>
+            <hr>
+            Recebemos de <strong>${recibo.nome}</strong> a quantia de <strong>R$ ${parseFloat(recibo.valor).toFixed(2)}</strong> referente à venda de cartelas.
+            <hr>
+            TIMONHA, ${recibo.data}
+          </div>
+        `;
+      } else {
+        content = document.getElementById("reciboParaExportar");
+        if (!content) {
+          alert("Gere um recibo antes.");
+          return;
+        }
+      }
+
+      const opt = {
+        margin:       0.5,
+        filename:     'recibo.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2 },
+        jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+      };
+
+      html2pdf().set(opt).from(content).save();
+    }
+
+    function excluirRecibo(index) {
+      if (!confirm("Deseja realmente excluir este recibo?")) return;
+      const recibos = JSON.parse(localStorage.getItem("recibos") || "[]");
+      recibos.splice(index, 1);
+      localStorage.setItem("recibos", JSON.stringify(recibos));
+      listarRecibos();
+    }
+
+    function editarRecibo(index) {
+      const recibos = JSON.parse(localStorage.getItem("recibos") || "[]");
+      const novoValor = prompt("Novo valor (R$):", recibos[index].valor);
+      if (novoValor !== null && !isNaN(novoValor)) {
+        recibos[index].valor = parseFloat(novoValor).toFixed(2);
+        localStorage.setItem("recibos", JSON.stringify(recibos));
+        listarRecibos();
+      }
+    }
+
+    function listarRecibos() {
+      const tbody = document.getElementById("listaRecibos");
+      tbody.innerHTML = "";
+      const recibos = JSON.parse(localStorage.getItem("recibos") || "[]");
+      recibos.forEach((r, i) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${r.data}</td>
+          <td>${r.nome}</td>
+          <td>R$ ${parseFloat(r.valor).toFixed(2)}</td>
+          <td>
+            <button onclick='exportarPDF(${JSON.stringify(r)})'>PDF</button>
+            <button onclick='editarRecibo(${i})'>Editar</button>
+            <button onclick='excluirRecibo(${i})'>Excluir</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    listarRecibos();
+  </script>
+
+</body>
+</html>

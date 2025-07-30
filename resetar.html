@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resetar Sistema</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background-color: #f8f8f8;
+      text-align: center;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+    h2 {
+      margin-top: 40px;
+      color: #c62828;
+    }
+    button {
+      background-color: #d32f2f;
+      color: white;
+      padding: 16px 32px;
+      font-size: 18px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 40px;
+    }
+    button:hover {
+      background-color: #b71c1c;
+    }
+    .clock {
+      font-weight: normal;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div>Usuário logado: <span id="usuarioLogado">---</span></div>
+    <div class="clock" id="relogio">--:--:--</div>
+  </div>
+
+  <h2>⚠️ ATENÇÃO</h2>
+  <p>Ao clicar no botão abaixo, todos os dados do sistema serão apagados.</p>
+
+  <button onclick="resetarSistema()">Resetar Sistema</button>
+
+  <script>
+    document.getElementById("usuarioLogado").textContent = localStorage.getItem("usuarioLogado") || "Desconhecido";
+
+    function atualizarRelogio() {
+      const agora = new Date();
+      document.getElementById("relogio").textContent =
+        agora.toLocaleDateString() + " " + agora.toLocaleTimeString();
+    }
+    setInterval(atualizarRelogio, 1000);
+    atualizarRelogio();
+
+    function resetarSistema() {
+      const confirmar = confirm("Você está prestes a apagar todos os dados. Deseja continuar?");
+      if (confirmar) {
+        const senha = prompt("Digite a senha de administrador para confirmar:");
+        if (senha === "admin12345") {
+          localStorage.clear();
+          alert("Sistema resetado com sucesso.");
+          window.location.href = "index.html";
+        } else {
+          alert("Senha incorreta. Operação cancelada.");
+        }
+      }
+    }
+  </script>
+
+</body>
+</html>

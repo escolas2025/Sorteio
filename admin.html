@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Painel Admin</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      background: #f9f9f9;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 15px;
+      background: #1976d2;
+      color: white;
+      text-align: left;
+      font-weight: bold;
+      font-size: 1.2rem;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    button {
+      width: 100%;
+      max-width: 300px;
+      padding: 12px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      font-weight: bold;
+      background: #2196f3;
+      color: white;
+    }
+
+    button:hover {
+      background: #0b7dda;
+    }
+  </style>
+</head>
+<body onload="carregarAdmin()">
+  <header id="nomeUsuario">Admin</header>
+
+  <main>
+    <button onclick="location.href='cadastro_vendedores.html'">Cadastro de Vendedores</button>
+    <button onclick="location.href='caixa.html'">Caixa</button>
+    <button onclick="location.href='despesas.html'">Despesas</button>
+    <button onclick="location.href='relatorio.html'">Relatório</button>
+    <button onclick="location.href='backup.html'">Backup</button>
+    <button onclick="location.href='resetar.html'">Resetar Sistema</button>
+    <button onclick="location.href='recibo.html'">Recibo</button>
+    <button onclick="sair()">Sair</button>
+  </main>
+
+  <script>
+    function carregarAdmin() {
+      const nome = localStorage.getItem('usuarioLogado') || 'Admin';
+      document.getElementById('nomeUsuario').textContent = nome.charAt(0).toUpperCase() + nome.slice(1);
+    }
+
+    function sair() {
+      localStorage.removeItem('usuarioLogado');
+      window.location.href = 'index.html';
+    }
+  </script>
+</body>
+</html>
