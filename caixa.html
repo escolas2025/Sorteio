@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Caixa</title>
+  <title>Caixa com Vendas por Bloco</title>
   <style>
     * { box-sizing: border-box; font-family: Arial, sans-serif; }
     body { padding: 20px; background: #f5f5f5; }
@@ -14,7 +14,7 @@
     th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
     th { background-color: #f0f0f0; }
     .totais { margin-top: 15px; font-weight: bold; text-align: center; }
-    input[type="text"] { width: 80px; padding: 3px; }
+    input[type="text"] { width: 60px; padding: 3px; }
     button {
       padding: 10px 20px;
       background-color: #2196f3;
@@ -26,6 +26,11 @@
     }
     button:hover { background-color: #0b7dda; }
     .center { text-align: center; }
+    .form-add-venda { margin: 20px 0; background: white; padding: 15px; border-radius: 5px; }
+    .form-add-venda input, .form-add-venda select {
+      padding: 6px;
+      margin-right: 10px;
+    }
   </style>
 </head>
 <body>
@@ -36,7 +41,7 @@
   </div>
 
   <hr>
-  <h2>MOVIMENTO CAIXA</h2>
+  <h2>MOVIMENTO CAIXA (Vendas por Bloco)</h2>
   <hr>
 
   <div class="totais">
@@ -45,7 +50,16 @@
     TOTAL FINAL: <span id="totalFinal">R$ 0,00</span>
   </div>
 
-  <hr>
+  <!-- Form para adicionar venda -->
+  <div class="form-add-venda center">
+    <h3>Adicionar Venda</h3>
+    <select id="selectVendedor"></select>
+    <input type="date" id="inputData" />
+    <input type="number" id="inputRecebeu" placeholder="Recebeu" min="0" />
+    <input type="number" id="inputDevolveu" placeholder="Devolveu" min="0" />
+    <input type="number" id="inputPagou" placeholder="Pagou" min="0" step="0.01" />
+    <button onclick="adicionarVendaFormulario()">Adicionar</button>
+  </div>
 
   <table id="tabelaCaixa">
     <thead>
@@ -57,7 +71,7 @@
         <th>Pagou</th>
         <th>Deve</th>
         <th>Bloco</th>
-        <th>Editar</th>
+        <th>Editar Bloco</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -85,23 +99,54 @@
 
     document.getElementById("usuarioLogado").textContent = localStorage.getItem("usuarioLogado") || "Desconhecido";
 
-    let vendedores = JSON.parse(localStorage.getItem("vendedores") || "[]");
-    let vendas = JSON.parse(localStorage.getItem("vendas") || "{}");
+    // Simulando vendedores e cotação
+    // Se quiser adicionar vendedores manualmente, basta alterar o localStorage ou o array aqui
+    let vendedores = JSON.parse(localStorage.getItem("vendedores") || '[
+      {"nome": "João", "cotacao": 5.5},
+      {"nome": "Maria", "cotacao": 6.0},
+      {"nome": "Carlos", "cotacao": 5.0}
+    ]');
+
     let blocos = JSON.parse(localStorage.getItem("blocos") || "{}");
+
+    let vendasPorBloco = JSON.parse(localStorage.getItem("vendasPorBloco") || "{}");
     let despesas = JSON.parse(localStorage.getItem("despesas") || "[]");
 
     const tbody = document.querySelector("#tabelaCaixa tbody");
+    const selectVendedor = document.getElementById("selectVendedor");
 
-    let totalApurado = 0;
-    let totalPagou = 0;
+    // Preencher select com vendedores
+    function preencherSelectVendedores() {
+      selectVendedor.innerHTML = "";
+      vendedores.forEach(v => {
+        const option = document.createElement("option");
+        option.value = v.nome;
+        option.textContent = v.nome;
+        selectVendedor.appendChild(option);
 
+        // Se não tiver bloco, coloca bloco "1" como padrão
+        if (!blocos[v.nome]) {
+          blocos[v.nome] = "1";
+        }
+      });
+      salvarBlocos();
+    }
+
+    function salvarBlocos() {
+      localStorage.setItem("blocos", JSON.stringify(blocos));
+    }
+
+    // Atualiza a tabela
     function atualizarTabela() {
       tbody.innerHTML = "";
-      totalApurado = 0;
-      totalPagou = 0;
+      let totalApurado = 0;
+      let totalPagou = 0;
 
       vendedores.forEach(v => {
-        const listaVendas = vendas[v.nome] || [];
+        const blocoVendedor = blocos[v.nome] || "0";
+        const vendasDoBloco = vendasPorBloco[blocoVendedor] || {};
+        const listaVendas = vendasDoBloco[v.nome] || [];
+
         listaVendas.forEach(venda => {
           const vendeu = venda.recebeu - venda.devolveu;
           const apurou = vendeu * v.cotacao;
@@ -118,7 +163,7 @@
             <td>R$ ${apurou.toFixed(2)}</td>
             <td>R$ ${pagou.toFixed(2)}</td>
             <td>R$ ${deve.toFixed(2)}</td>
-            <td><input type="text" value="${blocos[v.nome] || ''}" onchange="salvarBloco('${v.nome}', this.value)"/></td>
+            <td><input type="text" value="${blocos[v.nome] || ''}" onchange="salvarBloco('${v.nome}', this.value)" /></td>
             <td><button onclick="editarBlocoPrompt('${v.nome}')">Editar</button></td>
           `;
           tbody.appendChild(tr);
@@ -133,41 +178,101 @@
       document.getElementById("totalFinal").textContent = `R$ ${totalFinal.toFixed(2)}`;
     }
 
-    atualizarTabela();
+    // Salvar bloco e mover vendas entre blocos
+    function salvarBloco(nome, novoBloco) {
+      const blocoAtual = blocos[nome] || "0";
+      if (blocoAtual === novoBloco) return;
 
-    function salvarBloco(nome, valor) {
-      blocos[nome] = valor;
-      localStorage.setItem("blocos", JSON.stringify(blocos));
+      // Atualiza bloco
+      blocos[nome] = novoBloco;
+      salvarBlocos();
+
+      if (!vendasPorBloco[novoBloco]) vendasPorBloco[novoBloco] = {};
+      if (!vendasPorBloco[blocoAtual]) vendasPorBloco[blocoAtual] = {};
+
+      const vendasAntigas = vendasPorBloco[blocoAtual][nome] || [];
+
+      // Remove vendas do bloco antigo
+      delete vendasPorBloco[blocoAtual][nome];
+
+      // Adiciona ao novo bloco, concatenando se já existir
+      vendasPorBloco[novoBloco][nome] = (vendasPorBloco[novoBloco][nome] || []).concat(vendasAntigas);
+
+      localStorage.setItem("vendasPorBloco", JSON.stringify(vendasPorBloco));
+      atualizarTabela();
     }
 
     function editarBlocoPrompt(nome) {
       const novoValor = prompt("Informe o número do bloco para " + nome + ":", blocos[nome] || "");
-      if (novoValor !== null) {
-        salvarBloco(nome, novoValor);
-        atualizarTabela();
+      if (novoValor !== null && novoValor.trim() !== "") {
+        salvarBloco(nome, novoValor.trim());
       }
     }
 
+    // Função para adicionar venda via formulário
+    function adicionarVendaFormulario() {
+      const nome = selectVendedor.value;
+      const data = document.getElementById("inputData").value;
+      const recebeu = parseFloat(document.getElementById("inputRecebeu").value) || 0;
+      const devolveu = parseFloat(document.getElementById("inputDevolveu").value) || 0;
+      const pagou = parseFloat(document.getElementById("inputPagou").value) || 0;
+
+      if (!nome || !data) {
+        alert("Selecione o vendedor e informe a data.");
+        return;
+      }
+
+      const venda = { data, recebeu, devolveu, pagou };
+
+      adicionarVenda(nome, venda);
+
+      // Limpa campos
+      document.getElementById("inputData").value = "";
+      document.getElementById("inputRecebeu").value = "";
+      document.getElementById("inputDevolveu").value = "";
+      document.getElementById("inputPagou").value = "";
+
+      alert("Venda adicionada!");
+    }
+
+    // Função para adicionar venda no localStorage
+    function adicionarVenda(nome, venda) {
+      const bloco = blocos[nome] || "0";
+      if (!vendasPorBloco[bloco]) vendasPorBloco[bloco] = {};
+      if (!vendasPorBloco[bloco][nome]) vendasPorBloco[bloco][nome] = [];
+
+      vendasPorBloco[bloco][nome].push(venda);
+      localStorage.setItem("vendasPorBloco", JSON.stringify(vendasPorBloco));
+      atualizarTabela();
+    }
+
+    // Exportar para PDF
     function exportarPDF() {
       const doc = new jsPDF();
       doc.setFontSize(12);
-      doc.text("MOVIMENTO CAIXA", 80, 10);
+      doc.text("MOVIMENTO CAIXA (Vendas por Bloco)", 80, 10);
       doc.text(`Usuário: ${localStorage.getItem("usuarioLogado") || ""}`, 10, 20);
       doc.text(`Data: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, 10, 30);
-      doc.text(`TOTAL APURADO: R$ ${totalApurado.toFixed(2)}`, 10, 45);
-      doc.text(`TOTAL DESPESAS: R$ ${despesas.reduce((soma, d) => soma + parseFloat(d.valor || 0), 0).toFixed(2)}`, 10, 52);
-      doc.text(`TOTAL FINAL: R$ ${(totalApurado - despesas.reduce((soma, d) => soma + parseFloat(d.valor || 0), 0)).toFixed(2)}`, 10, 59);
+
+      let totalApurado = 0;
+      let totalPagou = 0;
 
       const headers = [["Nome", "Data", "Vendeu", "Apurou", "Pagou", "Deve", "Bloco"]];
       const rows = [];
 
       vendedores.forEach(v => {
-        const listaVendas = vendas[v.nome] || [];
+        const blocoVendedor = blocos[v.nome] || "0";
+        const vendasDoBloco = vendasPorBloco[blocoVendedor] || {};
+        const listaVendas = vendasDoBloco[v.nome] || [];
+
         listaVendas.forEach(venda => {
           const vendeu = venda.recebeu - venda.devolveu;
           const apurou = vendeu * v.cotacao;
           const pagou = venda.pagou || 0;
           const deve = apurou - pagou;
+          totalApurado += apurou;
+          totalPagou += pagou;
+
           rows.push([
             v.nome,
             venda.data,
@@ -180,6 +285,13 @@
         });
       });
 
+      const totalDespesas = despesas.reduce((soma, d) => soma + parseFloat(d.valor || 0), 0);
+      const totalFinal = totalApurado - totalDespesas;
+
+      doc.text(`TOTAL APURADO: R$ ${totalApurado.toFixed(2)}`, 10, 45);
+      doc.text(`TOTAL DESPESAS: R$ ${totalDespesas.toFixed(2)}`, 10, 52);
+      doc.text(`TOTAL FINAL: R$ ${totalFinal.toFixed(2)}`, 10, 59);
+
       doc.autoTable({
         startY: 70,
         head: headers,
@@ -189,16 +301,20 @@
       doc.save("movimento_caixa.pdf");
     }
 
+    // Zerar caixa (vendas e despesas)
     function zerarCaixa() {
       if (confirm("Deseja realmente zerar o caixa? Isso apagará todas as vendas e despesas.")) {
-        localStorage.removeItem("vendas");
+        localStorage.removeItem("vendasPorBloco");
         localStorage.removeItem("despesas");
-        vendas = {};
+        vendasPorBloco = {};
         despesas = [];
         atualizarTabela();
         alert("Caixa zerado com sucesso.");
       }
     }
+
+    preencherSelectVendedores();
+    atualizarTabela();
   </script>
 </body>
 </html>
